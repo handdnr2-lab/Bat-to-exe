@@ -59,6 +59,7 @@ python3 zscaler_bat_to_exe_gui.py
 3. `BAT+Origin -> EXE 생성` 클릭
 
 앱은 내부적으로 임시 스테이징 폴더를 만들고, BAT/Origin 파일을 C# 컴파일 리소스로 포함해 `csc.exe`로 단일 EXE를 컴파일합니다.
+컴파일 결과가 0KB이면 성공으로 처리하지 않고 오류로 안내합니다.
 
 생성 BAT는 최소 구성으로 `@echo off` + 설치 명령만 포함합니다.
 

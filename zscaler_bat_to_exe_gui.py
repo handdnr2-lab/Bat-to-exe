@@ -325,11 +325,12 @@ class App:
                 encoding="utf-8",
             )
 
+            compiled_exe = stage / "compiled_launcher.exe"
             cmd = [
                 str(csc_path),
                 "/nologo",
                 "/target:winexe",
-                f"/out:{out_dir / cfg.output_exe_name}",
+                f"/out:{compiled_exe}",
                 f"/resource:{staged_bat},{staged_bat.name}",
                 f"/resource:{staged_origin},{staged_origin.name}",
                 str(wrapper_source),
@@ -345,8 +346,28 @@ class App:
                 messagebox.showerror("컴파일 실패", f"Exit code {proc.returncode}\n{detail}")
                 return
 
-        final_exe = out_dir / cfg.output_exe_name
-        messagebox.showinfo("완료", f"EXE 생성 완료:\n{final_exe}")
+            if not compiled_exe.exists():
+                detail = (proc.stderr or proc.stdout or "No compiler output").strip()
+                messagebox.showerror("컴파일 실패", f"컴파일 출력 파일이 생성되지 않았습니다.\n{detail}")
+                return
+
+            size = compiled_exe.stat().st_size
+            if size == 0:
+                detail = (proc.stderr or proc.stdout or "Compiler returned success but produced empty file").strip()
+                messagebox.showerror(
+                    "컴파일 실패",
+                    f"출력 EXE 크기가 0KB 입니다.\n"
+                    f"csc 출력:\n{detail}",
+                )
+                return
+
+            final_exe = out_dir / cfg.output_exe_name
+            if final_exe.exists():
+                final_exe.unlink()
+            shutil.copy2(compiled_exe, final_exe)
+
+        size_mb = final_exe.stat().st_size / (1024 * 1024)
+        messagebox.showinfo("완료", f"EXE 생성 완료:\n{final_exe}\n크기: {size_mb:.2f} MB")
 
     @staticmethod
     def _find_csc() -> Path | None:
