@@ -9,6 +9,7 @@ import shutil
 import shlex
 import subprocess
 import tempfile
+import time
 from dataclasses import dataclass, asdict
 from pathlib import Path
 import tkinter as tk
@@ -300,8 +301,8 @@ class App:
         bat_path = out_dir / cfg.bat_name
         bat_path.write_text(self._bat_content(self._build_install_command(cfg, self._collect_selected_parameters())), encoding="utf-8")
 
-        with tempfile.TemporaryDirectory(prefix="zcc_embed_") as tmp:
-            stage = Path(tmp)
+        stage = Path(tempfile.mkdtemp(prefix="zcc_embed_"))
+        try:
             staged_bat = stage / cfg.bat_name
             staged_origin = stage / Path(cfg.origin_file_path).name
             shutil.copy2(bat_path, staged_bat)
@@ -364,7 +365,33 @@ class App:
             final_exe = out_dir / cfg.output_exe_name
             if final_exe.exists():
                 final_exe.unlink()
-            shutil.copy2(compiled_exe, final_exe)
+            copied = False
+            for _ in range(10):
+                try:
+                    shutil.copy2(compiled_exe, final_exe)
+                    copied = True
+                    break
+                except PermissionError:
+                    time.sleep(0.4)
+
+            if not copied:
+                messagebox.showerror(
+                    "컴파일 실패",
+                    "생성된 EXE 파일 접근이 거부되었습니다.\n"
+                    "백신/보안프로그램이 파일을 잠시 점유했을 수 있습니다.\n"
+                    "잠시 후 다시 시도해 주세요.",
+                )
+                return
+
+        finally:
+            for _ in range(10):
+                try:
+                    shutil.rmtree(stage, ignore_errors=False)
+                    break
+                except PermissionError:
+                    time.sleep(0.3)
+                except OSError:
+                    break
 
         size_mb = final_exe.stat().st_size / (1024 * 1024)
         messagebox.showinfo("완료", f"EXE 생성 완료:\n{final_exe}\n크기: {size_mb:.2f} MB")
