@@ -3,7 +3,9 @@
 
 from __future__ import annotations
 
+import base64
 import json
+import os
 import shutil
 import shlex
 import subprocess
@@ -22,7 +24,6 @@ class BuildConfig:
     output_dir: str = ""
     bat_name: str = "install_zscaler.bat"
     installer_exe: str = DEFAULT_INSTALLER_EXE
-    bat2exe_path: str = ""
     origin_file: str = ""
     output_exe_name: str = "zcc-custom.exe"
 
@@ -117,7 +118,6 @@ class App:
             "output_dir": tk.StringVar(value=str(Path.cwd() / "build")),
             "bat_name": tk.StringVar(value="install_zscaler.bat"),
             "installer_exe": tk.StringVar(value=DEFAULT_INSTALLER_EXE),
-            "bat2exe_path": tk.StringVar(),
             "origin_file": tk.StringVar(),
             "output_exe_name": tk.StringVar(value="zcc-custom.exe"),
         }
@@ -137,9 +137,8 @@ class App:
         self._add_path_row(form, "Output Folder", "output_dir", 0)
         self._add_entry_row(form, "BAT File Name", "bat_name", 1)
         self._add_installer_row(form, "ZCC Origin File", "installer_exe", 2)
-        self._add_file_row(form, "BAT2EXE Tool Path", "bat2exe_path", 3)
-        self._add_file_row(form, "Embed Origin File", "origin_file", 4)
-        self._add_entry_row(form, "Output EXE Name", "output_exe_name", 5)
+        self._add_file_row(form, "Embed Origin File", "origin_file", 3)
+        self._add_entry_row(form, "Output EXE Name", "output_exe_name", 4)
 
         tabs_frame = ttk.LabelFrame(base, text="파라미터 선택 (체크된 항목만 BAT에 포함)")
         tabs_frame.pack(fill="both", expand=True, padx=10, pady=8)
@@ -303,9 +302,6 @@ class App:
 
     def generate_exe(self) -> None:
         cfg = self._collect_config()
-        if not cfg.bat2exe_path.strip():
-            messagebox.showerror("오류", "BAT2EXE Tool Path를 지정해 주세요.")
-            return
         if not cfg.origin_file.strip():
             messagebox.showerror("오류", "Embed Origin File을 지정해 주세요.")
             return
@@ -318,39 +314,71 @@ class App:
         bat_path = out_dir / cfg.bat_name
         bat_path.write_text(self._bat_content(self._build_install_command(cfg, self._collect_selected_parameters())), encoding="utf-8")
 
-        with tempfile.TemporaryDirectory(prefix="zcc_bat2exe_") as tmp:
+        with tempfile.TemporaryDirectory(prefix="zcc_embed_") as tmp:
             stage = Path(tmp)
             staged_bat = stage / cfg.bat_name
             staged_origin = stage / Path(cfg.origin_file).name
             shutil.copy2(bat_path, staged_bat)
             shutil.copy2(cfg.origin_file, staged_origin)
 
-            cmd = [
-                cfg.bat2exe_path,
-                f"/source:{staged_bat}",
-                f"/target:{out_dir}",
-                "/s",
-                "/y",
-            ]
+            csc_path = self._find_csc()
+            if not csc_path:
+                messagebox.showerror(
+                    "실행 실패",
+                    "C# 컴파일러(csc.exe)를 찾을 수 없습니다.\nWindows .NET SDK 또는 .NET Framework Developer Pack을 설치해 주세요.",
+                )
+                return
+
+            wrapper_source = stage / "ZccEmbeddedLauncher.cs"
+            wrapper_source.write_text(
+                self._build_wrapper_source(
+                    bat_path=staged_bat,
+                    origin_path=staged_origin,
+                    output_name=cfg.output_exe_name,
+                ),
+                encoding="utf-8",
+            )
+
+            cmd = [str(csc_path), "/nologo", "/target:winexe", f"/out:{out_dir / cfg.output_exe_name}", str(wrapper_source)]
             try:
                 proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
             except OSError as exc:
-                messagebox.showerror("실행 실패", f"BAT2EXE 실행 중 오류:\n{exc}")
+                messagebox.showerror("실행 실패", f"EXE 컴파일 중 오류:\n{exc}")
                 return
 
             if proc.returncode != 0:
                 detail = (proc.stderr or proc.stdout or "Unknown error").strip()
-                messagebox.showerror("변환 실패", f"Exit code {proc.returncode}\n{detail}")
+                messagebox.showerror("컴파일 실패", f"Exit code {proc.returncode}\n{detail}")
                 return
 
-        auto_exe = out_dir / f"{Path(cfg.bat_name).stem}.exe"
         final_exe = out_dir / cfg.output_exe_name
-        if auto_exe.exists() and auto_exe != final_exe:
-            if final_exe.exists():
-                final_exe.unlink()
-            auto_exe.rename(final_exe)
+        messagebox.showinfo("완료", f"EXE 생성 완료:\n{final_exe}")
 
-        messagebox.showinfo("완료", f"EXE 생성 완료:\n{final_exe if final_exe.exists() else auto_exe}")
+    @staticmethod
+    def _find_csc() -> Path | None:
+        in_path = shutil.which("csc")
+        if in_path:
+            return Path(in_path)
+
+        windir = os.environ.get("WINDIR", "C:\\Windows")
+        candidates = [
+            Path(windir) / "Microsoft.NET" / "Framework" / "v4.0.30319" / "csc.exe",
+            Path(windir) / "Microsoft.NET" / "Framework64" / "v4.0.30319" / "csc.exe",
+        ]
+        for c in candidates:
+            if c.exists():
+                return c
+        return None
+
+    @staticmethod
+    def _build_wrapper_source(bat_path: Path, origin_path: Path, output_name: str) -> str:
+        bat_data = base64.b64encode(bat_path.read_bytes()).decode("ascii")
+        origin_data = base64.b64encode(origin_path.read_bytes()).decode("ascii")
+        bat_name = bat_path.name
+        origin_name = origin_path.name
+        app_name = Path(output_name).stem or "zcc-custom"
+
+        return f'''using System;\nusing System.Diagnostics;\nusing System.IO;\n\nclass Program\n{{\n    static int Main()\n    {{\n        try\n        {{\n            var tempDir = Path.Combine(Path.GetTempPath(), "{app_name}_" + Guid.NewGuid().ToString("N"));\n            Directory.CreateDirectory(tempDir);\n\n            var originPath = Path.Combine(tempDir, "{origin_name}");\n            var batPath = Path.Combine(tempDir, "{bat_name}");\n\n            File.WriteAllBytes(originPath, Convert.FromBase64String("{origin_data}"));\n            File.WriteAllBytes(batPath, Convert.FromBase64String("{bat_data}"));\n\n            var psi = new ProcessStartInfo("cmd.exe", "/c \\"" + batPath + "\\"")\n            {{\n                WorkingDirectory = tempDir,\n                UseShellExecute = false,\n                CreateNoWindow = true,\n            }};\n\n            using (var p = Process.Start(psi))\n            {{\n                p.WaitForExit();\n                return p.ExitCode;\n            }}\n        }}\n        catch\n        {{\n            return 1;\n        }}\n    }}\n}}\n'''
 
     def reset_default_checks(self) -> None:
         for param, fields in self.param_vars.items():
