@@ -17,6 +17,8 @@
 - `cloudName`은 드롭다운 선택 제공 (`zscaler`, `zscalerone`, `zscalertwo`, `zscalerthree`, `zscloud`)
 - `mode`는 드롭다운 선택 제공 (`unattended`, `win32(Default)`)
 - `unattendedmodeui`는 드롭다운 선택 제공 (`none`, `minimal`, `minimalWithDialogs`)
+- `hideAppUIOnLaunch` 드롭다운 선택 제공 (`1`, `0`)
+- `launchTray` 드롭다운 선택 제공 (`1`, `0`)
 - `unattendedmodeui` 체크박스는 `mode=unattended`일 때만 활성화
 - 기본 체크값: `cloudName`, `userDomain`만 체크
 - `/install` 옵션 제거

@@ -61,6 +61,7 @@ DEFAULT_ENABLED = {"cloudName", "userDomain"}
 CLOUD_NAME_OPTIONS = ["", "zscaler", "zscalerone", "zscalertwo", "zscalerthree", "zscloud"]
 MODE_OPTIONS = ["", "unattended", "win32(Default)"]
 UNATTENDED_MODE_UI_OPTIONS = ["", "none", "minimal", "minimalWithDialogs"]
+BOOLEAN_10_OPTIONS = ["", "1", "0"]
 
 
 class App:
@@ -135,6 +136,10 @@ class App:
                 entry.bind("<<ComboboxSelected>>", lambda _: self._on_mode_changed())
             elif param == "unattendedmodeui":
                 entry = ttk.Combobox(parent, textvariable=value_var, values=UNATTENDED_MODE_UI_OPTIONS, state="readonly", width=42)
+                entry.grid(row=row_idx, column=1, sticky="ew", padx=8, pady=4)
+                entry.bind("<<ComboboxSelected>>", lambda _: self._refresh_preview())
+            elif param in {"hideAppUIOnLaunch", "launchTray"}:
+                entry = ttk.Combobox(parent, textvariable=value_var, values=BOOLEAN_10_OPTIONS, state="readonly", width=42)
                 entry.grid(row=row_idx, column=1, sticky="ew", padx=8, pady=4)
                 entry.bind("<<ComboboxSelected>>", lambda _: self._refresh_preview())
             else:
