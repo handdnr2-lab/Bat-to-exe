@@ -19,6 +19,8 @@
 - `unattendedmodeui`는 드롭다운 선택 제공 (`none`, `minimal`, `minimalWithDialogs`)
 - `hideAppUIOnLaunch` 드롭다운 선택 제공 (`1`, `0`)
 - `launchTray` 드롭다운 선택 제공 (`1`, `0`)
+- `strictEnforcement` 드롭다운 선택 제공 (`1`, `0`)
+- `strictEnforcement` 체크박스는 `cloudName` + `policyToken` 체크 시에만 활성화
 - `unattendedmodeui` 체크박스는 `mode=unattended`일 때만 활성화
 - 기본 체크값: `cloudName`, `userDomain`만 체크
 - `/install` 옵션 제거

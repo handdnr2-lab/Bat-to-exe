@@ -122,7 +122,7 @@ class App:
             enabled_var = tk.BooleanVar(value=param in DEFAULT_ENABLED)
             value_var = tk.StringVar()
 
-            on_toggle = self._on_mode_changed if param == "mode" else self._refresh_preview
+            on_toggle = lambda p=param: self._on_param_toggle(p)
             chk = ttk.Checkbutton(parent, text=f"--{param}", variable=enabled_var, command=on_toggle)
             chk.grid(row=row_idx, column=0, sticky="w", padx=8, pady=4)
 
@@ -142,6 +142,10 @@ class App:
                 entry = ttk.Combobox(parent, textvariable=value_var, values=BOOLEAN_10_OPTIONS, state="readonly", width=42)
                 entry.grid(row=row_idx, column=1, sticky="ew", padx=8, pady=4)
                 entry.bind("<<ComboboxSelected>>", lambda _: self._refresh_preview())
+            elif param == "strictEnforcement":
+                entry = ttk.Combobox(parent, textvariable=value_var, values=BOOLEAN_10_OPTIONS, state="readonly", width=42)
+                entry.grid(row=row_idx, column=1, sticky="ew", padx=8, pady=4)
+                entry.bind("<<ComboboxSelected>>", lambda _: self._refresh_preview())
             else:
                 entry = ttk.Entry(parent, textvariable=value_var, width=45)
                 entry.grid(row=row_idx, column=1, sticky="ew", padx=8, pady=4)
@@ -154,6 +158,7 @@ class App:
             self.param_checkbuttons[param] = chk
 
         self._update_unattended_mode_ui_state()
+        self._update_strict_enforcement_state()
 
     def _add_entry_row(self, parent: ttk.Widget, label: str, key: str, row: int) -> None:
         ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", padx=8, pady=5)
@@ -240,6 +245,7 @@ class App:
             if param not in DEFAULT_ENABLED:
                 fields["value"].set("")
         self._update_unattended_mode_ui_state()
+        self._update_strict_enforcement_state()
         self._refresh_preview()
 
     def save_preset(self) -> None:
@@ -276,11 +282,18 @@ class App:
                 self.param_vars[param]["value"].set(str(saved.get("value", "")))
 
         self._update_unattended_mode_ui_state()
+        self._update_strict_enforcement_state()
         self._refresh_preview()
         messagebox.showinfo("불러오기", f"Preset 불러오기 완료:\n{path}")
 
     def _on_mode_changed(self) -> None:
         self._update_unattended_mode_ui_state()
+        self._refresh_preview()
+
+    def _on_param_toggle(self, param: str) -> None:
+        if param in {"mode", "cloudName", "policyToken"}:
+            self._update_unattended_mode_ui_state()
+            self._update_strict_enforcement_state()
         self._refresh_preview()
 
     def _update_unattended_mode_ui_state(self) -> None:
@@ -302,6 +315,22 @@ class App:
             ui_fields["enabled"].set(False)
             ui_fields["value"].set("")
             ui_checkbox.state(["disabled"])
+
+    def _update_strict_enforcement_state(self) -> None:
+        cloud_fields = self.param_vars.get("cloudName")
+        policy_fields = self.param_vars.get("policyToken")
+        strict_fields = self.param_vars.get("strictEnforcement")
+        strict_checkbox = self.param_checkbuttons.get("strictEnforcement")
+        if not cloud_fields or not policy_fields or not strict_fields or not strict_checkbox:
+            return
+
+        allow = bool(cloud_fields["enabled"].get()) and bool(policy_fields["enabled"].get())
+        if allow:
+            strict_checkbox.state(["!disabled"])
+        else:
+            strict_fields["enabled"].set(False)
+            strict_fields["value"].set("")
+            strict_checkbox.state(["disabled"])
 
 
 if __name__ == "__main__":
