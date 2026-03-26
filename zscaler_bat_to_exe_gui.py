@@ -3,7 +3,6 @@
 
 from __future__ import annotations
 
-import base64
 import json
 import os
 import shutil
@@ -319,14 +318,22 @@ class App:
             wrapper_source = stage / "ZccEmbeddedLauncher.cs"
             wrapper_source.write_text(
                 self._build_wrapper_source(
-                    bat_path=staged_bat,
-                    origin_path=staged_origin,
+                    bat_name=staged_bat.name,
+                    origin_name=staged_origin.name,
                     output_name=cfg.output_exe_name,
                 ),
                 encoding="utf-8",
             )
 
-            cmd = [str(csc_path), "/nologo", "/target:winexe", f"/out:{out_dir / cfg.output_exe_name}", str(wrapper_source)]
+            cmd = [
+                str(csc_path),
+                "/nologo",
+                "/target:winexe",
+                f"/out:{out_dir / cfg.output_exe_name}",
+                f"/resource:{staged_bat},{staged_bat.name}",
+                f"/resource:{staged_origin},{staged_origin.name}",
+                str(wrapper_source),
+            ]
             try:
                 proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
             except OSError as exc:
@@ -358,21 +365,9 @@ class App:
         return None
 
     @staticmethod
-    def _build_wrapper_source(bat_path: Path, origin_path: Path, output_name: str) -> str:
-        bat_data = base64.b64encode(bat_path.read_bytes()).decode("ascii")
-        origin_data = base64.b64encode(origin_path.read_bytes()).decode("ascii")
-        bat_name = bat_path.name
-        origin_name = origin_path.name
+    def _build_wrapper_source(bat_name: str, origin_name: str, output_name: str) -> str:
         app_name = Path(output_name).stem or "zcc-custom"
-        chunk = 12000
-
-        bat_chunks = [bat_data[i:i + chunk] for i in range(0, len(bat_data), chunk)]
-        origin_chunks = [origin_data[i:i + chunk] for i in range(0, len(origin_data), chunk)]
-
-        bat_array = ",\n                ".join(f"\"{c}\"" for c in bat_chunks)
-        origin_array = ",\n                ".join(f"\"{c}\"" for c in origin_chunks)
-
-        return f'''using System;\nusing System.Diagnostics;\nusing System.IO;\nusing System.Linq;\n\nclass Program\n{{\n    static int Main()\n    {{\n        try\n        {{\n            var tempDir = Path.Combine(Path.GetTempPath(), "{app_name}_" + Guid.NewGuid().ToString("N"));\n            Directory.CreateDirectory(tempDir);\n\n            var originPath = Path.Combine(tempDir, "{origin_name}");\n            var batPath = Path.Combine(tempDir, "{bat_name}");\n\n            var originBase64 = string.Concat(new[]\n            {{\n                {origin_array}\n            }});\n\n            var batBase64 = string.Concat(new[]\n            {{\n                {bat_array}\n            }});\n\n            File.WriteAllBytes(originPath, Convert.FromBase64String(originBase64));\n            File.WriteAllBytes(batPath, Convert.FromBase64String(batBase64));\n\n            var psi = new ProcessStartInfo("cmd.exe", "/c \\"" + batPath + "\\"")\n            {{\n                WorkingDirectory = tempDir,\n                UseShellExecute = false,\n                CreateNoWindow = true,\n            }};\n\n            using (var p = Process.Start(psi))\n            {{\n                p.WaitForExit();\n                return p.ExitCode;\n            }}\n        }}\n        catch\n        {{\n            return 1;\n        }}\n    }}\n}}\n'''
+        return f'''using System;\nusing System.Diagnostics;\nusing System.IO;\nusing System.Reflection;\n\nclass Program\n{{\n    static int Main()\n    {{\n        try\n        {{\n            var tempDir = Path.Combine(Path.GetTempPath(), "{app_name}_" + Guid.NewGuid().ToString("N"));\n            Directory.CreateDirectory(tempDir);\n\n            var originPath = Path.Combine(tempDir, "{origin_name}");\n            var batPath = Path.Combine(tempDir, "{bat_name}");\n\n            ExtractResource("{origin_name}", originPath);\n            ExtractResource("{bat_name}", batPath);\n\n            var psi = new ProcessStartInfo("cmd.exe", "/c \\"" + batPath + "\\"")\n            {{\n                WorkingDirectory = tempDir,\n                UseShellExecute = false,\n                CreateNoWindow = true,\n            }};\n\n            using (var p = Process.Start(psi))\n            {{\n                p.WaitForExit();\n                return p.ExitCode;\n            }}\n        }}\n        catch\n        {{\n            return 1;\n        }}\n    }}\n\n    static void ExtractResource(string name, string outputPath)\n    {{\n        var asm = Assembly.GetExecutingAssembly();\n        using (var input = asm.GetManifestResourceStream(name))\n        {{\n            if (input == null)\n                throw new Exception("Resource not found: " + name);\n            using (var output = File.Create(outputPath))\n                input.CopyTo(output);\n        }}\n    }}\n}}\n'''
 
     def reset_default_checks(self) -> None:
         for param, fields in self.param_vars.items():
