@@ -15,9 +15,12 @@
   - 사용 여부 체크박스
   - 값 입력칸 제공 (비우면 플래그만 포함)
 - `cloudName`은 드롭다운 선택 제공 (`zscaler`, `zscalerone`, `zscalertwo`, `zscalerthree`, `zscloud`)
+- `mode`는 드롭다운 선택 제공 (`unattended`, `win32(Default)`)
+- `unattendedmodeui`는 드롭다운 선택 제공 (`none`, `minimal`, `minimalWithDialogs`)
+- `unattendedmodeui` 체크박스는 `mode=unattended`일 때만 활성화
 - 기본 체크값: `cloudName`, `userDomain`만 체크
 - `/install` 옵션 제거
-- `installer exe name` 입력 제거 (내부에서 `ZSATrayManager.exe` 사용)
+- Installer EXE는 Browse로 선택하며, 경로 없이 파일명만 BAT에 포함
 
 ## 탭 구성
 
@@ -37,9 +40,10 @@ python3 zscaler_bat_to_exe_gui.py
 ## 사용 방법
 
 1. `Output Folder`, `BAT File Name` 입력
-2. 탭별로 필요한 파라미터 체크 + 값 입력
-3. Preview 확인
-4. `BAT 생성`
+2. `Installer EXE`를 Browse로 선택 (파일명만 사용)
+3. 탭별로 필요한 파라미터 체크 + 값 입력
+4. Preview 확인
+5. `BAT 생성`
 
 생성 BAT는 최소 구성으로 `@echo off` + 설치 명령만 포함합니다.
 

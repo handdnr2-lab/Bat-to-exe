@@ -11,13 +11,14 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 
-INSTALLER_EXE = "ZSATrayManager.exe"
+DEFAULT_INSTALLER_EXE = "ZSATrayManager.exe"
 
 
 @dataclass
 class BuildConfig:
     output_dir: str = ""
     bat_name: str = "install_zscaler.bat"
+    installer_exe: str = DEFAULT_INSTALLER_EXE
 
 
 PARAMETER_TABS: list[tuple[str, list[str]]] = [
@@ -58,6 +59,8 @@ PARAMETER_TABS: list[tuple[str, list[str]]] = [
 
 DEFAULT_ENABLED = {"cloudName", "userDomain"}
 CLOUD_NAME_OPTIONS = ["", "zscaler", "zscalerone", "zscalertwo", "zscalerthree", "zscloud"]
+MODE_OPTIONS = ["", "unattended", "win32(Default)"]
+UNATTENDED_MODE_UI_OPTIONS = ["", "none", "minimal", "minimalWithDialogs"]
 
 
 class App:
@@ -69,8 +72,10 @@ class App:
         self.vars = {
             "output_dir": tk.StringVar(value=str(Path.cwd() / "build")),
             "bat_name": tk.StringVar(value="install_zscaler.bat"),
+            "installer_exe": tk.StringVar(value=DEFAULT_INSTALLER_EXE),
         }
         self.param_vars: dict[str, dict[str, tk.Variable]] = {}
+        self.param_checkbuttons: dict[str, ttk.Checkbutton] = {}
 
         self._build_ui()
         self._refresh_preview()
@@ -84,6 +89,7 @@ class App:
 
         self._add_path_row(form, "Output Folder", "output_dir", 0)
         self._add_entry_row(form, "BAT File Name", "bat_name", 1)
+        self._add_installer_row(form, "Installer EXE", "installer_exe", 2)
 
         tabs_frame = ttk.LabelFrame(base, text="파라미터 선택 (체크된 항목만 BAT에 포함)")
         tabs_frame.pack(fill="both", expand=True, padx=10, pady=8)
@@ -122,6 +128,14 @@ class App:
                 entry = ttk.Combobox(parent, textvariable=value_var, values=CLOUD_NAME_OPTIONS, state="readonly", width=42)
                 entry.grid(row=row_idx, column=1, sticky="ew", padx=8, pady=4)
                 entry.bind("<<ComboboxSelected>>", lambda _: self._refresh_preview())
+            elif param == "mode":
+                entry = ttk.Combobox(parent, textvariable=value_var, values=MODE_OPTIONS, state="readonly", width=42)
+                entry.grid(row=row_idx, column=1, sticky="ew", padx=8, pady=4)
+                entry.bind("<<ComboboxSelected>>", lambda _: self._on_mode_changed())
+            elif param == "unattendedmodeui":
+                entry = ttk.Combobox(parent, textvariable=value_var, values=UNATTENDED_MODE_UI_OPTIONS, state="readonly", width=42)
+                entry.grid(row=row_idx, column=1, sticky="ew", padx=8, pady=4)
+                entry.bind("<<ComboboxSelected>>", lambda _: self._refresh_preview())
             else:
                 entry = ttk.Entry(parent, textvariable=value_var, width=45)
                 entry.grid(row=row_idx, column=1, sticky="ew", padx=8, pady=4)
@@ -131,6 +145,9 @@ class App:
 
             parent.columnconfigure(1, weight=1)
             self.param_vars[param] = {"enabled": enabled_var, "value": value_var}
+            self.param_checkbuttons[param] = chk
+
+        self._update_unattended_mode_ui_state()
 
     def _add_entry_row(self, parent: ttk.Widget, label: str, key: str, row: int) -> None:
         ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", padx=8, pady=5)
@@ -150,6 +167,20 @@ class App:
 
         ttk.Button(parent, text="Browse", command=browse).grid(row=row, column=2, padx=5, pady=5)
 
+    def _add_installer_row(self, parent: ttk.Widget, label: str, key: str, row: int) -> None:
+        self._add_entry_row(parent, label, key, row)
+
+        def browse() -> None:
+            chosen = filedialog.askopenfilename(
+                title="Installer EXE 선택",
+                filetypes=[("Executable", "*.exe"), ("All files", "*.*")],
+            )
+            if chosen:
+                self.vars[key].set(Path(chosen).name)
+                self._refresh_preview()
+
+        ttk.Button(parent, text="Browse", command=browse).grid(row=row, column=2, padx=5, pady=5)
+
     def _collect_config(self) -> BuildConfig:
         return BuildConfig(**{k: v.get() for k, v in self.vars.items()})
 
@@ -161,8 +192,8 @@ class App:
                 selected.append((param, value))
         return selected
 
-    def _build_install_command(self, selected: list[tuple[str, str]]) -> str:
-        parts = [INSTALLER_EXE]
+    def _build_install_command(self, cfg: BuildConfig, selected: list[tuple[str, str]]) -> str:
+        parts = [cfg.installer_exe or DEFAULT_INSTALLER_EXE]
         for param, value in selected:
             parts.append(f"--{param}")
             if value:
@@ -175,7 +206,8 @@ class App:
 """
 
     def _refresh_preview(self) -> None:
-        cmd = self._build_install_command(self._collect_selected_parameters())
+        cfg = self._collect_config()
+        cmd = self._build_install_command(cfg, self._collect_selected_parameters())
         content = self._bat_content(cmd)
 
         self.preview.configure(state="normal")
@@ -193,7 +225,7 @@ class App:
         out_dir.mkdir(parents=True, exist_ok=True)
 
         bat_path = out_dir / cfg.bat_name
-        bat_path.write_text(self._bat_content(self._build_install_command(self._collect_selected_parameters())), encoding="utf-8")
+        bat_path.write_text(self._bat_content(self._build_install_command(cfg, self._collect_selected_parameters())), encoding="utf-8")
         messagebox.showinfo("완료", f"BAT 생성 완료:\n{bat_path}")
 
     def reset_default_checks(self) -> None:
@@ -201,6 +233,7 @@ class App:
             fields["enabled"].set(param in DEFAULT_ENABLED)
             if param not in DEFAULT_ENABLED:
                 fields["value"].set("")
+        self._update_unattended_mode_ui_state()
         self._refresh_preview()
 
     def save_preset(self) -> None:
@@ -236,8 +269,34 @@ class App:
                 self.param_vars[param]["enabled"].set(bool(saved.get("enabled", False)))
                 self.param_vars[param]["value"].set(str(saved.get("value", "")))
 
+        self._update_unattended_mode_ui_state()
         self._refresh_preview()
         messagebox.showinfo("불러오기", f"Preset 불러오기 완료:\n{path}")
+
+    def _on_mode_changed(self) -> None:
+        self._update_unattended_mode_ui_state()
+        self._refresh_preview()
+
+    def _update_unattended_mode_ui_state(self) -> None:
+        mode_fields = self.param_vars.get("mode")
+        if not mode_fields:
+            return
+
+        mode_enabled = bool(mode_fields["enabled"].get())
+        mode_value = str(mode_fields["value"].get()).strip()
+        allow_unattended_ui = mode_enabled and mode_value == "unattended"
+
+        ui_checkbox = self.param_checkbuttons.get("unattendedmodeui")
+        ui_fields = self.param_vars.get("unattendedmodeui")
+        if not ui_checkbox or not ui_fields:
+            return
+
+        if allow_unattended_ui:
+            ui_checkbox.state(["!disabled"])
+        else:
+            ui_fields["enabled"].set(False)
+            ui_fields["value"].set("")
+            ui_checkbox.state(["disabled"])
 
 
 if __name__ == "__main__":
