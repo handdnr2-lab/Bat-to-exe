@@ -13,7 +13,8 @@
 - 파라미터를 카테고리별 **탭으로 분리**
 - 각 파라미터별로
   - 사용 여부 체크박스
-  - 값 입력칸 제공 (비우면 플래그만 포함)
+  - 값 입력칸 제공
+  - 우측에 파라미터 설명 표시
 - `cloudName`은 드롭다운 선택 제공 (`zscaler`, `zscalerone`, `zscalertwo`, `zscalerthree`, `zscloud`)
 - `mode`는 드롭다운 선택 제공 (`unattended`, `win32(Default)`)
 - `unattendedmodeui`는 드롭다운 선택 제공 (`none`, `minimal`, `minimalWithDialogs`)

@@ -28,11 +28,11 @@ PARAMETER_TABS: list[tuple[str, list[str]]] = [
     ),
     (
         "설치/실행",
-        ["mode", "unattendedmodeui", "hideAppUIOnLaunch", "launchTray", "installer-language"],
+        ["mode", "unattendedmodeui", "hideAppUIOnLaunch", "launchTray", "installer-language", "installWebView2"],
     ),
     (
         "보안/동작",
-        ["enableFips", "strictEnforcement", "enableAntiTampering", "enableSSO", "mtAuthRequired"],
+        ["enableFips", "strictEnforcement", "enableAntiTampering", "enableImprivataIntegration", "enableSSO", "mtAuthRequired"],
     ),
     (
         "네트워크/드라이버",
@@ -62,6 +62,43 @@ CLOUD_NAME_OPTIONS = ["", "zscaler", "zscalerone", "zscalertwo", "zscalerthree",
 MODE_OPTIONS = ["", "unattended", "win32(Default)"]
 UNATTENDED_MODE_UI_OPTIONS = ["", "none", "minimal", "minimalWithDialogs"]
 BOOLEAN_10_OPTIONS = ["", "1", "0"]
+
+PARAMETER_DESCRIPTIONS: dict[str, str] = {
+    "userDomain": "사용자 조직의 도메인 이름 (SAML NameID 기준 도메인)",
+    "cloudName": "사용자가 연결될 Zscaler 클라우드 이름",
+    "userName": "사용자 계정 이름 (도메인 제외)",
+    "deviceToken": "Zscaler Client Connector Portal에서 발급된 디바이스 인증 토큰",
+    "policyToken": "사용자 등록 전에 적용할 App Profile 정책을 지정하는 토큰",
+    "enableFips": "FIPS 규격을 준수하는 보안 라이브러리 사용 여부",
+    "externalDeviceId": "MDM과 Zscaler 간 디바이스를 매핑하기 위한 식별자",
+    "hideAppUIOnLaunch": "사용자 등록 전 앱 UI를 숨길지 여부",
+    "strictEnforcement": "사용자 등록 전 인터넷 접근을 차단하는 강제 정책 모드",
+    "reinstallDriver": "기존 드라이버가 있어도 강제로 재설치 여부",
+    "mode": "무인 설치(사용자 개입 없이 설치) 여부 설정",
+    "unattendedmodeui": "무인 설치 시 사용자에게 표시되는 UI 수준",
+    "uninstallPasswordCmdLine": "무인 제거 시 사용할 비밀번호",
+    "enableAntiTampering": "사용자가 프로그램을 중지/변경/삭제하지 못하도록 보호",
+    "enableImprivataIntegration": "Imprivata OneSign과의 연동 기능 활성화",
+    "bcpConfigFilePath": "장애 상황 시 사용할 Business Continuity 설정 파일 경로",
+    "bcpMAPublicKeyHash": "Business Continuity 설정 파일 검증용 공개키 값",
+    "importSEFailCloseConfig": "strict enforcement 모드에서 사용할 fail-close 설정 파일",
+    "failCloseConfigThumbprint": "fail-close 설정 파일 검증용 공개키 값",
+    "revertzcc": "이전 버전으로 되돌리기(롤백) 수행 여부",
+    "revertPasswordCmdLine": "롤백 수행 시 사용할 비밀번호",
+    "installer-language": "설치 프로그램에서 사용할 언어",
+    "installWebView2": "WebView2 프레임워크 설치 여부",
+    "enableSSO": "Windows 계정 기반 SSO 인증 사용 여부",
+    "LWFBootStart": "LWF 드라이버를 부팅 시 자동 시작하도록 설정",
+    "useLWFDriver": "패킷 필터 기반 LWF 드라이버 사용 여부",
+    "installLWFDriver": "NDIS 기반 LWF 드라이버 설치 여부",
+    "vdi": "VDI(가상 데스크탑 환경)에서 설치 여부",
+    "externalRedirect": "브라우저 기반 인증 방식 사용 여부",
+    "configTimeout": "설정 파일 다운로드 대기 시간(초)",
+    "mtAuthRequired": "머신 터널 시작 전에 사용자 인증을 요구할지 여부",
+    "upgradePasswordCmdLine": "무인 업그레이드 시 사용할 비밀번호",
+    "enableCustomProxyDetection": "초기 정책 다운로드 시 커스텀 방식으로 프록시 탐지",
+    "launchTray": "설치 후 프로그램을 자동 실행할지 여부",
+}
 
 
 class App:
@@ -151,7 +188,8 @@ class App:
                 entry.grid(row=row_idx, column=1, sticky="ew", padx=8, pady=4)
                 entry.bind("<KeyRelease>", lambda _: self._refresh_preview())
 
-            ttk.Label(parent, text="값(비우면 플래그만 추가)").grid(row=row_idx, column=2, sticky="w", padx=8, pady=4)
+            desc = PARAMETER_DESCRIPTIONS.get(param, "")
+            ttk.Label(parent, text=desc, wraplength=360, justify="left").grid(row=row_idx, column=2, sticky="w", padx=8, pady=4)
 
             parent.columnconfigure(1, weight=1)
             self.param_vars[param] = {"enabled": enabled_var, "value": value_var}
