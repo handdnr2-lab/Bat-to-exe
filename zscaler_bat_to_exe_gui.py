@@ -23,8 +23,7 @@ DEFAULT_INSTALLER_EXE = "Zscaler-windows-4.7.0.168-installer-x64.exe"
 class BuildConfig:
     output_dir: str = ""
     bat_name: str = "install_zscaler.bat"
-    installer_exe: str = DEFAULT_INSTALLER_EXE
-    origin_file: str = ""
+    origin_file_path: str = ""
     output_exe_name: str = "zcc-custom.exe"
 
 
@@ -117,8 +116,7 @@ class App:
         self.vars = {
             "output_dir": tk.StringVar(value=str(Path.cwd() / "build")),
             "bat_name": tk.StringVar(value="install_zscaler.bat"),
-            "installer_exe": tk.StringVar(value=DEFAULT_INSTALLER_EXE),
-            "origin_file": tk.StringVar(),
+            "origin_file_path": tk.StringVar(),
             "output_exe_name": tk.StringVar(value="zcc-custom.exe"),
         }
         self.param_vars: dict[str, dict[str, tk.Variable]] = {}
@@ -136,9 +134,8 @@ class App:
 
         self._add_path_row(form, "Output Folder", "output_dir", 0)
         self._add_entry_row(form, "BAT File Name", "bat_name", 1)
-        self._add_installer_row(form, "ZCC Origin File", "installer_exe", 2)
-        self._add_file_row(form, "Embed Origin File", "origin_file", 3)
-        self._add_entry_row(form, "Output EXE Name", "output_exe_name", 4)
+        self._add_origin_row(form, "ZCC Origin File", "origin_file_path", 2)
+        self._add_entry_row(form, "Output EXE Name", "output_exe_name", 3)
 
         tabs_frame = ttk.LabelFrame(base, text="파라미터 선택 (체크된 항목만 BAT에 포함)")
         tabs_frame.pack(fill="both", expand=True, padx=10, pady=8)
@@ -228,25 +225,14 @@ class App:
 
         ttk.Button(parent, text="Browse", command=browse).grid(row=row, column=2, padx=5, pady=5)
 
-    def _add_installer_row(self, parent: ttk.Widget, label: str, key: str, row: int) -> None:
+    def _add_origin_row(self, parent: ttk.Widget, label: str, key: str, row: int) -> None:
         self._add_entry_row(parent, label, key, row)
 
         def browse() -> None:
             chosen = filedialog.askopenfilename(
-                title="Installer EXE 선택",
+                title="Origin EXE 선택",
                 filetypes=[("Executable", "*.exe"), ("All files", "*.*")],
             )
-            if chosen:
-                self.vars[key].set(Path(chosen).name)
-                self._refresh_preview()
-
-        ttk.Button(parent, text="Browse", command=browse).grid(row=row, column=2, padx=5, pady=5)
-
-    def _add_file_row(self, parent: ttk.Widget, label: str, key: str, row: int) -> None:
-        self._add_entry_row(parent, label, key, row)
-
-        def browse() -> None:
-            chosen = filedialog.askopenfilename()
             if chosen:
                 self.vars[key].set(chosen)
                 self._refresh_preview()
@@ -265,7 +251,8 @@ class App:
         return selected
 
     def _build_install_command(self, cfg: BuildConfig, selected: list[tuple[str, str]]) -> str:
-        parts = [cfg.installer_exe or DEFAULT_INSTALLER_EXE]
+        origin_name = Path(cfg.origin_file_path).name if cfg.origin_file_path.strip() else DEFAULT_INSTALLER_EXE
+        parts = [origin_name]
         for param, value in selected:
             parts.append(f"--{param}")
             if value:
@@ -302,11 +289,11 @@ class App:
 
     def generate_exe(self) -> None:
         cfg = self._collect_config()
-        if not cfg.origin_file.strip():
-            messagebox.showerror("오류", "Embed Origin File을 지정해 주세요.")
+        if not cfg.origin_file_path.strip():
+            messagebox.showerror("오류", "ZCC Origin File을 지정해 주세요.")
             return
-        if not Path(cfg.origin_file).exists():
-            messagebox.showerror("오류", f"Origin 파일을 찾을 수 없습니다:\n{cfg.origin_file}")
+        if not Path(cfg.origin_file_path).exists():
+            messagebox.showerror("오류", f"Origin 파일을 찾을 수 없습니다:\n{cfg.origin_file_path}")
             return
 
         out_dir = Path(cfg.output_dir)
@@ -317,9 +304,9 @@ class App:
         with tempfile.TemporaryDirectory(prefix="zcc_embed_") as tmp:
             stage = Path(tmp)
             staged_bat = stage / cfg.bat_name
-            staged_origin = stage / Path(cfg.origin_file).name
+            staged_origin = stage / Path(cfg.origin_file_path).name
             shutil.copy2(bat_path, staged_bat)
-            shutil.copy2(cfg.origin_file, staged_origin)
+            shutil.copy2(cfg.origin_file_path, staged_origin)
 
             csc_path = self._find_csc()
             if not csc_path:
