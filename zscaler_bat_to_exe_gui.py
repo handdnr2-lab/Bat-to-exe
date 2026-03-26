@@ -377,8 +377,15 @@ class App:
         bat_name = bat_path.name
         origin_name = origin_path.name
         app_name = Path(output_name).stem or "zcc-custom"
+        chunk = 12000
 
-        return f'''using System;\nusing System.Diagnostics;\nusing System.IO;\n\nclass Program\n{{\n    static int Main()\n    {{\n        try\n        {{\n            var tempDir = Path.Combine(Path.GetTempPath(), "{app_name}_" + Guid.NewGuid().ToString("N"));\n            Directory.CreateDirectory(tempDir);\n\n            var originPath = Path.Combine(tempDir, "{origin_name}");\n            var batPath = Path.Combine(tempDir, "{bat_name}");\n\n            File.WriteAllBytes(originPath, Convert.FromBase64String("{origin_data}"));\n            File.WriteAllBytes(batPath, Convert.FromBase64String("{bat_data}"));\n\n            var psi = new ProcessStartInfo("cmd.exe", "/c \\"" + batPath + "\\"")\n            {{\n                WorkingDirectory = tempDir,\n                UseShellExecute = false,\n                CreateNoWindow = true,\n            }};\n\n            using (var p = Process.Start(psi))\n            {{\n                p.WaitForExit();\n                return p.ExitCode;\n            }}\n        }}\n        catch\n        {{\n            return 1;\n        }}\n    }}\n}}\n'''
+        bat_chunks = [bat_data[i:i + chunk] for i in range(0, len(bat_data), chunk)]
+        origin_chunks = [origin_data[i:i + chunk] for i in range(0, len(origin_data), chunk)]
+
+        bat_array = ",\n                ".join(f"\"{c}\"" for c in bat_chunks)
+        origin_array = ",\n                ".join(f"\"{c}\"" for c in origin_chunks)
+
+        return f'''using System;\nusing System.Diagnostics;\nusing System.IO;\nusing System.Linq;\n\nclass Program\n{{\n    static int Main()\n    {{\n        try\n        {{\n            var tempDir = Path.Combine(Path.GetTempPath(), "{app_name}_" + Guid.NewGuid().ToString("N"));\n            Directory.CreateDirectory(tempDir);\n\n            var originPath = Path.Combine(tempDir, "{origin_name}");\n            var batPath = Path.Combine(tempDir, "{bat_name}");\n\n            var originBase64 = string.Concat(new[]\n            {{\n                {origin_array}\n            }});\n\n            var batBase64 = string.Concat(new[]\n            {{\n                {bat_array}\n            }});\n\n            File.WriteAllBytes(originPath, Convert.FromBase64String(originBase64));\n            File.WriteAllBytes(batPath, Convert.FromBase64String(batBase64));\n\n            var psi = new ProcessStartInfo("cmd.exe", "/c \\"" + batPath + "\\"")\n            {{\n                WorkingDirectory = tempDir,\n                UseShellExecute = false,\n                CreateNoWindow = true,\n            }};\n\n            using (var p = Process.Start(psi))\n            {{\n                p.WaitForExit();\n                return p.ExitCode;\n            }}\n        }}\n        catch\n        {{\n            return 1;\n        }}\n    }}\n}}\n'''
 
     def reset_default_checks(self) -> None:
         for param, fields in self.param_vars.items():
