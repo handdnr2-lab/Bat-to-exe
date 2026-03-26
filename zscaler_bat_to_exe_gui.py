@@ -4,7 +4,10 @@
 from __future__ import annotations
 
 import json
+import shutil
 import shlex
+import subprocess
+import tempfile
 from dataclasses import dataclass, asdict
 from pathlib import Path
 import tkinter as tk
@@ -19,6 +22,9 @@ class BuildConfig:
     output_dir: str = ""
     bat_name: str = "install_zscaler.bat"
     installer_exe: str = DEFAULT_INSTALLER_EXE
+    bat2exe_path: str = ""
+    origin_file: str = ""
+    output_exe_name: str = "zcc-custom.exe"
 
 
 PARAMETER_TABS: list[tuple[str, list[str]]] = [
@@ -111,6 +117,9 @@ class App:
             "output_dir": tk.StringVar(value=str(Path.cwd() / "build")),
             "bat_name": tk.StringVar(value="install_zscaler.bat"),
             "installer_exe": tk.StringVar(value=DEFAULT_INSTALLER_EXE),
+            "bat2exe_path": tk.StringVar(),
+            "origin_file": tk.StringVar(),
+            "output_exe_name": tk.StringVar(value="zcc-custom.exe"),
         }
         self.param_vars: dict[str, dict[str, tk.Variable]] = {}
         self.param_checkbuttons: dict[str, ttk.Checkbutton] = {}
@@ -128,6 +137,9 @@ class App:
         self._add_path_row(form, "Output Folder", "output_dir", 0)
         self._add_entry_row(form, "BAT File Name", "bat_name", 1)
         self._add_installer_row(form, "ZCC Origin File", "installer_exe", 2)
+        self._add_file_row(form, "BAT2EXE Tool Path", "bat2exe_path", 3)
+        self._add_file_row(form, "Embed Origin File", "origin_file", 4)
+        self._add_entry_row(form, "Output EXE Name", "output_exe_name", 5)
 
         tabs_frame = ttk.LabelFrame(base, text="파라미터 선택 (체크된 항목만 BAT에 포함)")
         tabs_frame.pack(fill="both", expand=True, padx=10, pady=8)
@@ -145,6 +157,7 @@ class App:
         ttk.Button(actions, text="Preset 저장", command=self.save_preset).pack(side="left")
         ttk.Button(actions, text="Preset 불러오기", command=self.load_preset).pack(side="left", padx=5)
         ttk.Button(actions, text="기본 체크 복원", command=self.reset_default_checks).pack(side="left", padx=5)
+        ttk.Button(actions, text="BAT+Origin -> EXE 생성", command=self.generate_exe).pack(side="right", padx=5)
         ttk.Button(actions, text="BAT 생성", command=self.generate_bat).pack(side="right")
 
         preview_box = ttk.LabelFrame(base, text="BAT 내용 Preview")
@@ -230,6 +243,17 @@ class App:
 
         ttk.Button(parent, text="Browse", command=browse).grid(row=row, column=2, padx=5, pady=5)
 
+    def _add_file_row(self, parent: ttk.Widget, label: str, key: str, row: int) -> None:
+        self._add_entry_row(parent, label, key, row)
+
+        def browse() -> None:
+            chosen = filedialog.askopenfilename()
+            if chosen:
+                self.vars[key].set(chosen)
+                self._refresh_preview()
+
+        ttk.Button(parent, text="Browse", command=browse).grid(row=row, column=2, padx=5, pady=5)
+
     def _collect_config(self) -> BuildConfig:
         return BuildConfig(**{k: v.get() for k, v in self.vars.items()})
 
@@ -276,6 +300,57 @@ class App:
         bat_path = out_dir / cfg.bat_name
         bat_path.write_text(self._bat_content(self._build_install_command(cfg, self._collect_selected_parameters())), encoding="utf-8")
         messagebox.showinfo("완료", f"BAT 생성 완료:\n{bat_path}")
+
+    def generate_exe(self) -> None:
+        cfg = self._collect_config()
+        if not cfg.bat2exe_path.strip():
+            messagebox.showerror("오류", "BAT2EXE Tool Path를 지정해 주세요.")
+            return
+        if not cfg.origin_file.strip():
+            messagebox.showerror("오류", "Embed Origin File을 지정해 주세요.")
+            return
+        if not Path(cfg.origin_file).exists():
+            messagebox.showerror("오류", f"Origin 파일을 찾을 수 없습니다:\n{cfg.origin_file}")
+            return
+
+        out_dir = Path(cfg.output_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+        bat_path = out_dir / cfg.bat_name
+        bat_path.write_text(self._bat_content(self._build_install_command(cfg, self._collect_selected_parameters())), encoding="utf-8")
+
+        with tempfile.TemporaryDirectory(prefix="zcc_bat2exe_") as tmp:
+            stage = Path(tmp)
+            staged_bat = stage / cfg.bat_name
+            staged_origin = stage / Path(cfg.origin_file).name
+            shutil.copy2(bat_path, staged_bat)
+            shutil.copy2(cfg.origin_file, staged_origin)
+
+            cmd = [
+                cfg.bat2exe_path,
+                f"/source:{staged_bat}",
+                f"/target:{out_dir}",
+                "/s",
+                "/y",
+            ]
+            try:
+                proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            except OSError as exc:
+                messagebox.showerror("실행 실패", f"BAT2EXE 실행 중 오류:\n{exc}")
+                return
+
+            if proc.returncode != 0:
+                detail = (proc.stderr or proc.stdout or "Unknown error").strip()
+                messagebox.showerror("변환 실패", f"Exit code {proc.returncode}\n{detail}")
+                return
+
+        auto_exe = out_dir / f"{Path(cfg.bat_name).stem}.exe"
+        final_exe = out_dir / cfg.output_exe_name
+        if auto_exe.exists() and auto_exe != final_exe:
+            if final_exe.exists():
+                final_exe.unlink()
+            auto_exe.rename(final_exe)
+
+        messagebox.showinfo("완료", f"EXE 생성 완료:\n{final_exe if final_exe.exists() else auto_exe}")
 
     def reset_default_checks(self) -> None:
         for param, fields in self.param_vars.items():
