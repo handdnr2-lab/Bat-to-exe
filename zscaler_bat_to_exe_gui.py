@@ -11,7 +11,7 @@ import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
 
-DEFAULT_INSTALLER_EXE = "ZSATrayManager.exe"
+DEFAULT_INSTALLER_EXE = "Zscaler-windows-4.7.0.168-installer-x64.exe"
 
 
 @dataclass
@@ -27,12 +27,12 @@ PARAMETER_TABS: list[tuple[str, list[str]]] = [
         ["userDomain", "cloudName", "userName", "deviceToken", "policyToken"],
     ),
     (
-        "보안/동작",
-        ["enableFips", "strictEnforcement", "enableAntiTampering", "enableSSO", "mtAuthRequired"],
-    ),
-    (
         "설치/실행",
         ["mode", "unattendedmodeui", "hideAppUIOnLaunch", "launchTray", "installer-language"],
+    ),
+    (
+        "보안/동작",
+        ["enableFips", "strictEnforcement", "enableAntiTampering", "enableSSO", "mtAuthRequired"],
     ),
     (
         "네트워크/드라이버",
@@ -89,7 +89,7 @@ class App:
 
         self._add_path_row(form, "Output Folder", "output_dir", 0)
         self._add_entry_row(form, "BAT File Name", "bat_name", 1)
-        self._add_installer_row(form, "Installer EXE", "installer_exe", 2)
+        self._add_installer_row(form, "ZCC Origin File", "installer_exe", 2)
 
         tabs_frame = ttk.LabelFrame(base, text="파라미터 선택 (체크된 항목만 BAT에 포함)")
         tabs_frame.pack(fill="both", expand=True, padx=10, pady=8)
@@ -121,7 +121,8 @@ class App:
             enabled_var = tk.BooleanVar(value=param in DEFAULT_ENABLED)
             value_var = tk.StringVar()
 
-            chk = ttk.Checkbutton(parent, text=f"--{param}", variable=enabled_var, command=self._refresh_preview)
+            on_toggle = self._on_mode_changed if param == "mode" else self._refresh_preview
+            chk = ttk.Checkbutton(parent, text=f"--{param}", variable=enabled_var, command=on_toggle)
             chk.grid(row=row_idx, column=0, sticky="w", padx=8, pady=4)
 
             if param == "cloudName":
@@ -282,9 +283,8 @@ class App:
         if not mode_fields:
             return
 
-        mode_enabled = bool(mode_fields["enabled"].get())
         mode_value = str(mode_fields["value"].get()).strip()
-        allow_unattended_ui = mode_enabled and mode_value == "unattended"
+        allow_unattended_ui = mode_value == "unattended"
 
         ui_checkbox = self.param_checkbuttons.get("unattendedmodeui")
         ui_fields = self.param_vars.get("unattendedmodeui")

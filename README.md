@@ -20,13 +20,14 @@
 - `unattendedmodeui` 체크박스는 `mode=unattended`일 때만 활성화
 - 기본 체크값: `cloudName`, `userDomain`만 체크
 - `/install` 옵션 제거
-- Installer EXE는 Browse로 선택하며, 경로 없이 파일명만 BAT에 포함
+- `ZCC Origin File`은 Browse로 선택하며, 경로 없이 파일명만 BAT에 포함
+- `ZCC Origin File` 기본값: `Zscaler-windows-4.7.0.168-installer-x64.exe`
 
 ## 탭 구성
 
 - 기본/자주 사용
-- 보안/동작
 - 설치/실행
+- 보안/동작
 - 네트워크/드라이버
 - ZPA/고급
 - 기타/유지보수
@@ -40,7 +41,7 @@ python3 zscaler_bat_to_exe_gui.py
 ## 사용 방법
 
 1. `Output Folder`, `BAT File Name` 입력
-2. `Installer EXE`를 Browse로 선택 (파일명만 사용)
+2. `ZCC Origin File`을 Browse로 선택 (파일명만 사용)
 3. 탭별로 필요한 파라미터 체크 + 값 입력
 4. Preview 확인
 5. `BAT 생성`
