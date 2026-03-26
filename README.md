@@ -14,6 +14,7 @@
 - 각 파라미터별로
   - 사용 여부 체크박스
   - 값 입력칸 제공 (비우면 플래그만 포함)
+- `cloudName`은 드롭다운 선택 제공 (`zscaler`, `zscalerone`, `zscalertwo`, `zscalerthree`, `zscloud`)
 - 기본 체크값: `cloudName`, `userDomain`만 체크
 - `/install` 옵션 제거
 - `installer exe name` 입력 제거 (내부에서 `ZSATrayManager.exe` 사용)
@@ -39,6 +40,8 @@ python3 zscaler_bat_to_exe_gui.py
 2. 탭별로 필요한 파라미터 체크 + 값 입력
 3. Preview 확인
 4. `BAT 생성`
+
+생성 BAT는 최소 구성으로 `@echo off` + 설치 명령만 포함합니다.
 
 ## 주의
 

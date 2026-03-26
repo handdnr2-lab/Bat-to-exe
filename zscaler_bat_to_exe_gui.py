@@ -57,6 +57,7 @@ PARAMETER_TABS: list[tuple[str, list[str]]] = [
 ]
 
 DEFAULT_ENABLED = {"cloudName", "userDomain"}
+CLOUD_NAME_OPTIONS = ["", "zscaler", "zscalerone", "zscalertwo", "zscalerthree", "zscloud"]
 
 
 class App:
@@ -117,9 +118,14 @@ class App:
             chk = ttk.Checkbutton(parent, text=f"--{param}", variable=enabled_var, command=self._refresh_preview)
             chk.grid(row=row_idx, column=0, sticky="w", padx=8, pady=4)
 
-            entry = ttk.Entry(parent, textvariable=value_var, width=45)
-            entry.grid(row=row_idx, column=1, sticky="ew", padx=8, pady=4)
-            entry.bind("<KeyRelease>", lambda _: self._refresh_preview())
+            if param == "cloudName":
+                entry = ttk.Combobox(parent, textvariable=value_var, values=CLOUD_NAME_OPTIONS, state="readonly", width=42)
+                entry.grid(row=row_idx, column=1, sticky="ew", padx=8, pady=4)
+                entry.bind("<<ComboboxSelected>>", lambda _: self._refresh_preview())
+            else:
+                entry = ttk.Entry(parent, textvariable=value_var, width=45)
+                entry.grid(row=row_idx, column=1, sticky="ew", padx=8, pady=4)
+                entry.bind("<KeyRelease>", lambda _: self._refresh_preview())
 
             ttk.Label(parent, text="값(비우면 플래그만 추가)").grid(row=row_idx, column=2, sticky="w", padx=8, pady=4)
 
@@ -165,18 +171,7 @@ class App:
 
     def _bat_content(self, command: str) -> str:
         return f"""@echo off
-setlocal
-
-echo Zscaler Client Connector install 시작...
 {command}
-
-if %errorlevel% neq 0 (
-    echo 설치 실패: %errorlevel%
-    exit /b %errorlevel%
-)
-
-echo 설치 완료
-exit /b 0
 """
 
     def _refresh_preview(self) -> None:
