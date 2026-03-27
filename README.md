@@ -44,6 +44,15 @@
 python3 zscaler_bat_to_exe_gui.py
 ```
 
+## PyInstaller로 GUI EXE 만들기
+
+```bash
+pyinstaller --clean --noconfirm --onedir --console --name zcc-bat-builder zscaler_bat_to_exe_gui.py
+```
+
+위 명령(onedir/console) 기준으로 실행 시 GUI가 정상 동작하는 것을 확인했습니다.  
+실행 시 문제가 있으면 빌드 산출물 폴더에서 `zcc_gui_startup_error.log`를 확인하세요.
+
 ## 사용 방법
 
 1. `Output Folder`, `BAT File Name` 입력
@@ -58,11 +67,14 @@ python3 zscaler_bat_to_exe_gui.py
 2. `Output EXE Name` 지정
 3. `BAT+Origin -> EXE 생성` 클릭
 
-앱은 내부적으로 임시 스테이징 폴더를 만들고, BAT/Origin 파일을 C# 컴파일 리소스로 포함해 `csc.exe`로 단일 EXE를 컴파일합니다.
+앱은 내부적으로 임시 스테이징 폴더를 만들고, `csc.exe`로 리소스 포함 C# 런처를 컴파일해 단일 EXE를 생성합니다.
 컴파일 결과가 0KB이면 성공으로 처리하지 않고 오류로 안내합니다.
-Windows 보안 프로그램으로 인해 생성 직후 파일 잠금이 발생할 수 있어, 복사/정리 단계는 자동 재시도합니다.
+Windows 보안 프로그램으로 인해 생성 직후 파일 잠금이 발생할 수 있어, EXE 크기 확인/임시 정리 단계는 자동 재시도합니다.
+컴파일 로그는 `output_dir/zcc_exe_build.log`에 저장됩니다.
 
 생성 BAT는 최소 구성으로 `@echo off` + 설치 명령만 포함합니다.
+BAT 실행 시 `cd /d "%~dp0"`를 먼저 수행해, 같은 폴더에 풀린 Origin EXE를 기준으로 실행합니다.
+생성된 런처 EXE 실행 시, EXE와 같은 폴더의 `<Output EXE Name>_files` 하위에 BAT/Origin 파일을 풀고 BAT를 실행합니다.
 
 ## 주의
 
